@@ -1,3 +1,3 @@
 from caro_board import Gomoku
-
-game = Gomoku(size = 10, game_mode = 1)
+import os
+game = Gomoku(size = 8, game_mode = 1)

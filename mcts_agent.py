@@ -2,15 +2,12 @@ import math
 import random
 import numpy as np
 from mcts_node import MCTSNode
-from tensorflow import keras
 from tqdm import tqdm
 
 class MCTSAgent:
-    def __init__(self, model_path="cnn_model.keras", simulations=100000, exploration_weight=1.5):
+    def __init__(self, model_path="cnn_model.keras", simulations=100000, exploration_weight=math.sqrt(2)):
         self.simulations = simulations
         self.exploration_weight = exploration_weight
-        # Load the trained CNN model for move evaluation
-        self.model = keras.models.load_model(model_path)
 
     def choose_move(self, state):
         root = MCTSNode(state)
@@ -20,7 +17,9 @@ class MCTSAgent:
                 result = self.simulation(node.state.clone())
                 self.backpropagation(node, result)
                 pbar.update(1)
-        best_move = root.best_child(exploration_weight=0)
+        for i in root.children:
+            print(i.state.last_move, i.visits, i.wins)
+        best_move = root.best_child(self.exploration_weight)
         return best_move.state.last_move
 
     def selection(self, node):
@@ -31,7 +30,9 @@ class MCTSAgent:
         return node
 
     def expand(self, node):
-        moves = node.state.get_move()
+        moves = node.state.check_3_4(-node.state.turn, node.state.last_move[0], node.state.last_move[1])
+        if len(moves) == 0:
+            moves = node.state.get_move()
         for move in moves:
             if move not in [child.state.last_move for child in node.children]:
                 new_state = node.state.clone()
@@ -44,42 +45,25 @@ class MCTSAgent:
     def simulation(self, state):
         original_player = state.turn
         while not state.is_terminal():
-            moves = state.get_move()
+            moves = state.get_legal_moves()
 
-            # Check for a winning move for the current player
             winning_move = self.find_winning_move(state, moves, original_player)
-            if winning_move:
+            if winning_move is not None:
                 state = state.make_move(winning_move)
                 continue
-
-            # Use CNN to evaluate all legal moves and pick the best move
-            best_move = self.get_best_move(state, moves)
-            state = state.make_move(best_move)
-
-        return 1 if state.winner == original_player else 0
+            move = self.random_move(state)
+            state = state.clone().make_move(move)
+        return 1 if state.winner == original_player else -1 if state.winner == -original_player else 0
 
     def find_winning_move(self, state, moves, player):
         """Check if there's a winning move for the current player."""
         for move in moves:
-            new_state = state.make_move(move)
+            state_new = state.clone()
+            new_state = state_new.make_move(move)
             if new_state.is_terminal() and new_state.winner == player:
                 return move
         return None
 
-    def get_best_move(self, state, moves):
-        """Evaluate all legal moves and return the best one."""
-        # Evaluate all legal moves at once using CNN
-        scores = self.evaluate_moves(state, moves)
-        # Choose the move with the highest score
-        best_move = moves[np.argmax(scores)]
-        return best_move
-
-    def evaluate_moves(self, state, moves):
-        """Evaluate a list of moves using the CNN model."""
-        states = [state.make_move(move) for move in moves]
-        model_inputs = np.array([s.to_model_input() for s in states])
-        scores = self.model.predict(model_inputs, verbose=False).flatten()
-        return scores
 
     def backpropagation(self, node, result):
         while node is not None:

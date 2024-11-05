@@ -31,11 +31,65 @@ class State:
                 if self.board[i][j] != 0:
                     return True
         return False
+    
+    def check_3_4(self, player, x, y):
+        moves = []
+        column = [self.board[y - 1][i] for i in range(max(0, x - self.win_length), min(self.Board_Size, x + self.win_length - 1))]
+        for i in range(len(column) - 4):
+            line = column[i:i+5]
+            if self.check_line_num(line, player, 4):
+                locations = np.where(np.array(line) == 0)[0]
+                if len(locations) > 0:
+                    for k in locations:
+                        move_x = max(0, x - self.win_length + 1) + i + k
+                        if x < self.win_length:
+                            move_x +=1
+                        if self.board[y - 1][move_x - 1] == 0:
+                            moves.append((move_x, y))
+        
+        for i in range(len(column) - 3):
+            line = column[i:i+4]
+            if self.check_line_num(line, player, 3):
+                locations = np.where(np.array(line) == 0)[0]
+                if len(locations) > 0:
+                    for k in locations:
+                        move_x = max(0, x - self.win_length + 1) + i + k
+                        if x < self.win_length:
+                            move_x +=1
+                        if self.board[y - 1][move_x - 1] == 0:
+                            moves.append((move_x, y))
+
+        row = [self.board[i][x - 1] for i in range(max(0, y - self.win_length), min(self.Board_Size, y + self.win_length - 1))]
+        for i in range(len(row) - 4):
+            line = row[i:i+5]
+            if self.check_line_num(line, player, 4):
+                locations = np.where(np.array(line) == 0)[0]
+                if len(locations) > 0:
+                    for k in locations:
+                        move_y = max(0, y - self.win_length + 1) + i + k
+                        if y < self.win_length:
+                            move_y +=1
+                        if self.board[move_y - 1][x - 1] == 0:
+                            moves.append((x, move_y))
+                        
+        for i in range(len(row) - 3):
+            line = row[i:i+4]
+            if self.check_line_num(line, player, 3):
+                locations = np.where(np.array(line) == 0)[0]
+                if len(locations) > 0:
+                    for k in locations:
+                        move_y = max(0, y - self.win_length + 1) + i + k
+                        if y < self.win_length:
+                            move_y +=1
+                        if self.board[move_y - 1][x - 1] == 0:
+                            moves.append((x, move_y))
+
+        return moves
+
     def get_move(self):
         moves = self.get_legal_moves()
         ans = []
         for move in moves:
-            #check around the move
             x,y = move
             if self.board[y - 1][x - 1] == 0 and self.check_around(x, y):
                 ans.append(move)
@@ -45,6 +99,10 @@ class State:
         for i in range(len(line) - len(pattern) + 1):
             if line[i:i+len(pattern)] == pattern:
                 return True
+            
+    def check_line_num(self, line, player, num):
+        count = np.sum(np.array(line) == player)
+        return count == num
 
     def win_check(self, player):
         x,y = self.last_move
@@ -101,7 +159,7 @@ class Gomoku:
 
 
         # Game State
-        board = [[0] * self.Board_Size for _ in range(self.Board_Size)]
+        board = np.zeros((self.Board_Size, self.Board_Size), dtype=np.int64)
         self.state = State(board, 1, self.win_length)
 
         # Board Arrays and Coordinates
@@ -115,7 +173,7 @@ class Gomoku:
             self.create_board()
             self.s.bind("<Button-1>", self.mouse_click)
             self.Turn_Text = self.score_board()
-            self.agent = MCTSAgent(simulations=300)
+            self.agent = MCTSAgent(simulations=500)
             self.gamemode_1()
 
         if game_mode == 2:
@@ -200,7 +258,7 @@ class Gomoku:
                 move = None
                 while move is None:
                     move = self.agent.choose_move(state)
-                print(move, 1)
+                print("Move:", move)
                 X, Y = move
             else:
                 X, Y = self.Click_Cord
